@@ -37,7 +37,10 @@
 ;; installed packages.  Don't delete this line.  If you don't want it,
 ;; just comment it out by adding a semicolon to the start of the line.
 ;; You may delete these explanatory comments.
-;(package-initialize)
+
+(package-initialize)
+(set-frame-size (selected-frame) 180 45)
+(set-frame-position (selected-frame) 20 50)
 
 (defvar current-user
   (getenv
@@ -141,8 +144,8 @@ by Prelude.")
     '(defun enriched-decode-display-prop (start end &optional param)
        (list start end))))
 
-(prelude-eval-after-init
- ;; greet the use with some useful tip
- (run-at-time 5 nil 'prelude-tip-of-the-day))
+;;(prelude-eval-after-init
+;; greet the use with some useful tip
+;;(run-at-time 5 nil 'prelude-tip-of-the-day))
 
 ;;; init.el ends here
