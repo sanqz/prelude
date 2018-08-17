@@ -409,7 +409,12 @@ by Prelude.")
       (select-window window)
       (find-file-other-window (file-name-sans-versions file t)))))
 
-(define-key dired-mode-map [mouse-1] 'dired-mouse-find-file)
+(define-key dired-mode-map [double-mouse-1] 'dired-mouse-find-file)
+(define-key dired-mode-map [mouse-2] 'dired-mouse-find-file)
+
+;;(local-unset-key [mouse-2])
+;;(define-key [mouse-2] key nil)
+
 (require 'dired-details-s)
 (use-package org-bullets
   :ensure t
