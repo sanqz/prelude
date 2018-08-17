@@ -18,6 +18,7 @@ savefile/
 projectile-bookmarks.eld
 session*
 .cask
+server
 tramp
 /var/pcache
 .emacs.desktop
