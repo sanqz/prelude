@@ -39,7 +39,7 @@
 ;; You may delete these explanatory comments.
 
 (package-initialize)
-(set-frame-size (selected-frame) 180 45)
+(set-frame-size (selected-frame) 130 30)
 (set-frame-position (selected-frame) 20 50)
 
 (defvar current-user
@@ -181,6 +181,7 @@ by Prelude.")
 ;; (smooth-scroll-mode -1)
 
 (tool-bar-mode t)
+(menu-bar-mode t)
 (scroll-bar-mode -1)
 (defun set-font (english chinese english-size chinese-size)
   (set-face-attribute 'default nil :font
@@ -189,7 +190,7 @@ by Prelude.")
     (set-fontset-font (frame-parameter nil 'font) charset
                       (font-spec :family chinese :size chinese-size))))
 
-(set-font   "Microsoft YaHei Mono" "Microsoft YaHei Mono" 30 30)
+(set-font   "Microsoft YaHei Mono" "Microsoft YaHei Mono" 35 35)
 (add-hook 'emacs-lisp-mode-hook #'aggressive-indent-mode)
 
 (defun shift-region (distance)
@@ -216,16 +217,64 @@ by Prelude.")
 
 (global-set-key [C-S-right] 'shift-right)
 (global-set-key [C-S-left] 'shift-left)
-(org-babel-do-load-languages
- 'org-babel-load-languages
- '((ipython . t)
-   (python . t)
-   ;; other language
-   ))
-;;don't prompt me to confirm everytime I want to evaluate a block
-(setq org-confirm-babel-evaluate nil)
-;;display/update images in the buffer after I evaluate
-(add-hook 'org-babel-after-execute-hook 'org-display-inline-images 'append)
+
+(defun org-insert-image-from-clipboard ()
+  (interactive)
+  (let* ((the-dir (file-name-directory buffer-file-name))
+         (attachments-dir (concat the-dir "attachments"))
+         (png-file-name (format-time-string "%a%d%b%Y_%H%M%S.png"))
+         (png-path (concat attachments-dir "/" png-file-name))
+         (temp-buffer-name "CbImage2File-buffer"))
+    (call-process "CbImage2File" nil temp-buffer-name nil png-path)
+    (let ((result (with-current-buffer temp-buffer-name (buffer-string))))
+      (progn
+        (kill-buffer temp-buffer-name) 
+        (if (string= result "")
+            (progn 
+              (insert (concat "[[./attachments/" png-file-name "]]"))
+              (org-display-inline-images))
+          (insert result))))))
+
+(defun my/clipboard-image-to-file ()
+  "use imagemagick to write clipboard image to file "
+  (interactive)
+  (let* ( (img-dir "~/org/images")
+          (filename (concat  (make-temp-name
+                              (concat 
+                               "CAPT_"
+                               (format-time-string "%Y%m%d_%H%M%S_"))) ".png")))
+    (unless (file-exists-p img-dir)
+      (make-directory img-dir))
+    ;;(message filename)
+    (call-process "magick" nil nil nil "clipboard: " filename)
+    (insert (concat "[[" filename "]]"))) )
+
+(defun my/org-insert-clip-image ()
+  "insert clip image into org file"
+  (interactive)
+  (my/clipboard-image-to-file)
+  (org-display-inline-images)
+  )
+(global-set-key (kbd "C-S-y") 'my/org-insert-clip-image)
+
+;;org-mode set-up here
+(use-package org
+  :bind (("C-c a" . org-agenda)
+         ("C-c c" . org-capture))
+
+  :config
+  (setq org-default-notes-file "~/org/notes.org")
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((ipython . t)
+     (python . t)
+     ;; other language
+     ))
+  ;;don't prompt me to confirm everytime I want to evaluate a block
+  (setq org-confirm-babel-evaluate nil)
+  ;;display/update images in the buffer after I evaluate
+  (add-hook 'org-babel-after-execute-hook 'org-display-inline-images 'append)
+  )
 
 (defun my/toggle-line-numbers(&optional ARG)
   "display line-numbers or not"
@@ -254,11 +303,26 @@ by Prelude.")
   (message "Reloaded init.el OK."))
 (defun open-init-file ()
   (interactive)
-  (find-file (expand-file-name "~/.emacs.d/personal/custom.el")))
+  (find-file (expand-file-name "~/.emacs.d/init.el")))
 (global-set-key (kbd "M-n") 'my/toggle-line-numbers)
 (global-set-key (kbd "RET") 'newline-and-indent)
 (global-set-key (kbd "C-;") 'comment-or-uncomment-region)
 
+;; move line up
+(defun move-line-up ()
+  (interactive)
+  (transpose-lines 1)
+  (previous-line 2))
+
+;; move line down
+(defun move-line-down ()
+  (interactive)
+  (next-line 1)
+  (transpose-lines 1)
+  (previous-line 1))
+
+(global-set-key [M-up] 'move-line-up)
+(global-set-key [M-down] 'move-line-down)
 
 (use-package ace-jump-mode
   :ensure t
@@ -321,14 +385,66 @@ by Prelude.")
   :config
   (yas-load-directory (emacs-path "snippets"))
   (yas-global-mode 1))
+(yas-minor-mode 1)
 
+(require 'dired)
+(defun dired-mouse-find-file (event)
+  "In Dired, visit the file or directory name you click on."
+  (interactive "e")
+  (let (window pos file)
+    (save-excursion
+      (setq window (posn-window (event-end event))
+            pos (posn-point (event-end event)))
+      (if (not (windowp window))
+          (error "No file chosen"))
+      (set-buffer (window-buffer window))
+      (goto-char pos)
+      (setq file (dired-get-file-for-visit)))
+    (if (file-directory-p file)
+        (or (and (cdr dired-subdir-alist)
+                 (dired-goto-subdir file))
+            (progn
+              (select-window window)
+              (dired file)))
+      (select-window window)
+      (find-file-other-window (file-name-sans-versions file t)))))
+
+(define-key dired-mode-map [mouse-1] 'dired-mouse-find-file)
+(require 'dired-details-s)
+(use-package org-bullets
+  :ensure t
+  :config
+  (add-hook 'org-mode-hook (lambda () (org-bullets-mode 1)))
+  (setq org-bullets-bullet-list
+        '("λ"
+          "✓"
+          "✓"
+          "✓"
+          ;; ♥ ● ◇ ✚ ✜ ☯ ◆ ♠ ♣ ♦ ☢ ❀ ◆ ◖ ▶
+          ;; Small
+          ;; ► • ★ ▸
+          )
+        ))
+
+;;汉字  
+;; (setq utf-translate-cjk-mode t) 
+;; (set-language-environment 'utf-8)
+;; (set-keyboard-coding-system 'utf-8-mac) 
+;; (setq locale-coding-system 'utf-8)
+;; (set-default-coding-systems 'utf-8)
+;; (set-terminal-coding-system 'utf-8)
+;; (unless (eq system-type 'windows-nt)
+;;   (set-selection-coding-system 'utf-8))
+;; (prefer-coding-system 'utf-8)
+;; (when (eq system-type 'windows-nt)
+;;   (set-selection-coding-system 'utf-16-le))
 
 ;; Patch security vulnerability in Emacs versions older than 25.3
 (when (version< emacs-version "25.3")
   (eval-after-load "enriched"
     '(defun enriched-decode-display-prop (start end &optional param)
        (list start end))))
-
+(server-start)
 ;;(prelude-eval-after-init
 ;; greet the use with some useful tip
 ;;(run-at-time 5 nil 'prelude-tip-of-the-day))
